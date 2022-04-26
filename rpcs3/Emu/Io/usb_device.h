@@ -191,6 +191,8 @@ protected:
 	u8 current_config    = 1;
 	u8 current_interface = 0;
 	std::array<u8, 7> location{};
+	//u8 rb3_pro_mode;
+	u8 rb3_a1count;
 
 protected:
 	static u64 get_timestamp();

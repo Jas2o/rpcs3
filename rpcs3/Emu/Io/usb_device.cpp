@@ -140,6 +140,112 @@ void usb_device_passthrough::control_transfer(u8 bmRequestType, u8 bRequest, u16
 	if (transfer->setup_buf.size() < buf_size + 8)
 		transfer->setup_buf.resize(buf_size + 8);
 
+	//Modified for Rock Band 3 and Pro Guitar/Keys
+	switch (bmRequestType)
+	{
+	case 0x21:
+		//This does not appear to be required for passthrough
+		/*
+		if (buf_size > 2 && buf[0] == 0xE9)
+		{
+			if (buf[2] == 0x81)
+			{
+				rb3_pro_mode = 0;
+				sys_usbd.notice("RB3: Disable Pro Mode");
+			}
+			else if (buf[2] == 0x89)
+			{
+				rb3_pro_mode = 1;
+				sys_usbd.notice("RB3: Enable Pro Mode");
+			}
+		}
+		*/
+		break;
+	case 0xA1: //Get report
+		//This seems to be required to prevent Rock Band 3 from flooding the USB device with messages that can cause freezing or the controller not connecting.
+		if (bRequest == 0x01 && buf_size > 4)
+		{
+			sys_usbd.notice("RB3: A1Count: 0x%02X", rb3_a1count);
+
+			switch (rb3_a1count)
+			{
+			case 0:
+				buf[0] = 0xe9;
+				buf[1] = 0x00;
+				buf[2] = 0x00;
+				buf[3] = 0x00;
+				buf[4] = 0x02;
+				buf[5] = 0x00;
+				buf[6] = 0x00;
+				buf[7] = 0x00;
+				break;
+			case 1:
+				//All zero
+				buf[0] = 0x00;
+				buf[1] = 0x00;
+				buf[2] = 0x00;
+				buf[3] = 0x00;
+				buf[4] = 0x00;
+				buf[7] = 0x00;
+				break;
+			case 2:
+				buf[0] = 0x00;
+				buf[1] = 0x00;
+				buf[2] = 0x80;
+				buf[3] = 0x00;
+				buf[4] = 0x00;
+				buf[5] = 0x00;
+				buf[6] = 0x00;
+				buf[7] = 0x8a;
+				break;
+			case 3:
+				//All zero
+				buf[0] = 0x00;
+				buf[1] = 0x00;
+				buf[2] = 0x00;
+				buf[3] = 0x00;
+				buf[4] = 0x00;
+				buf[5] = 0x00;
+				buf[6] = 0x00;
+				buf[7] = 0x00;
+				break;
+			case 4:
+				buf[0] = 0x21;
+				buf[1] = 0x26;
+				buf[2] = 0x01;
+				buf[3] = 0x06;
+				buf[4] = 0x00;
+				buf[5] = 0x00;
+				buf[6] = 0x00;
+				buf[7] = 0x00;
+				break;
+			}
+
+			rb3_a1count++;
+			if (rb3_a1count > 4)
+				rb3_a1count = 0;
+		}
+		break;
+	case 0x80: //Get descriptor
+		//Without this, Rock Band 3 does not request interrupt messages.
+		if (bRequest == 0x06)
+		{
+			if (wValue == 0x0300)
+			{
+				buf[0] = 0x04;
+				buf[1] = 0x03;
+				buf[2] = 0x09;
+				buf[3] = 0x04;
+			}
+		}
+		break;
+	case 0x00:
+	default:
+		//sys_usbd.error("RB3: bmRequestType: 0x%02X", bmRequestType);
+		//sys_usbd.error("RB3: bRequest: 0x%02X", bRequest);
+		break;
+	}
+
 	libusb_fill_control_setup(transfer->setup_buf.data(), bmRequestType, bRequest, wValue, wIndex, buf_size);
 	memcpy(transfer->setup_buf.data() + 8, buf, buf_size);
 	libusb_fill_control_transfer(transfer->transfer, lusb_handle, transfer->setup_buf.data(), callback_transfer, transfer, 0);
